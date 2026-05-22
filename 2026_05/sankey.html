@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>D3 Sankey</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+  <style>
+    @font-face {
+  font-family: "Benton Sans";
+  src: url("../Benton Sans/Benton Sans Regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+    @font-face {
+  font-family: "Benton Strong";
+  src: url("../Benton Sans/Benton Sans Bold.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+body,
+svg,
+text {
+  font-family: "Benton Sans", sans-serif;
+}
+svg {
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+    .node text { alignment-baseline: middle; }
+    .link { fill: none; stroke-opacity: 0.7; }
+
+    svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+@media (max-width: 700px) {
+  svg {
+    width: 100%;
+    height: 1200px;
+  }
+}
+  </style>
+</head>
+<body>
+
+<svg></svg>
+
+<script>
+const width = 900;
+const height = 650;
+
+
+const rows = [
+  { source: "Dark Money", target: "Talarico", value: "$4,100,000" },
+  { source: "Campaign", target: "Talarico", value: "$40,284,109" },
+  { source: "Disclosed Donors", target: "Talarico", value: "$5,029,250" },
+  { source: "Dark Money", target: "Cornyn", value: "$13,180,000" },
+  { source: "Campaign", target: "Cornyn", value: "$12,891,770" },
+  { source: "Disclosed Donors", target: "Cornyn", value: "$20,962,697" },
+  { source: "Dark Money", target: "Paxton", value: "$350,000" },
+  { source: "Campaign", target: "Paxton", value: "$7,007,950" },
+  { source: "Disclosed Donors", target: "Paxton", value: "$5,745,850" }
+];
+
+// ORDER ARRAYS
+const SOURCE_ORDER = [
+  "Campaign",
+  "Disclosed Donors",
+    "Dark Money"
+];
+
+const TARGET_ORDER = [
+  "Talarico",
+  "Cornyn",
+  "Paxton"
+];
+
+// COLOR DICTIONARY
+const COLORS = {
+  "Dark Money": "#ED1C24",
+  "Campaign": "#00415B",
+  "Disclosed Donors": "#007194",
+
+  "Talarico": "#000",
+  "Cornyn": "#000",
+  "Paxton": "#000"
+};
+//FORMAT DOLLAR DISPLAY
+function formatMoneyShort(value) {
+  if (value >= 1e9) {
+    return "$" + (value / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+  }
+
+  if (value >= 1e6) {
+    return "$" + (value / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  }
+
+  if (value >= 1e3) {
+    return "$" + (value / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+  }
+
+  return "$" + value.toString();
+}
+
+// UNIQUE NODES
+const nodeNames = Array.from(
+  new Set(rows.flatMap(d => [d.source, d.target]))
+);
+
+
+// SORT USING ORDER ARRAYS
+const sortedNodeNames = [
+  ...SOURCE_ORDER,
+  ...TARGET_ORDER
+].filter(d => nodeNames.includes(d));
+
+
+// BUILD NODES
+const nodes = sortedNodeNames.map(name => ({
+  name,
+  color: COLORS[name] || "#999"
+}));
+
+const links = rows.map(d => ({
+  source: d.source,
+  target: d.target,
+  value: parseInt(
+    String(d.value)
+      .replace(/\$/g, "")
+      .replace(/,/g, ""),
+    10
+  ) || 0
+}));
+
+const data = { nodes, links };
+
+const sankey = d3.sankey()
+  .nodeId(d => d.name)
+  .nodeWidth(16)
+  .nodePadding(18)
+  .extent([[40, 40], [height - 40, width - 40]])
+  .nodeSort((a, b) => {
+    const sourceA = SOURCE_ORDER.indexOf(a.name);
+    const sourceB = SOURCE_ORDER.indexOf(b.name);
+
+    const targetA = TARGET_ORDER.indexOf(a.name);
+    const targetB = TARGET_ORDER.indexOf(b.name);
+
+    if (sourceA !== -1 && sourceB !== -1) {
+      return sourceA - sourceB;
+    }
+
+    if (targetA !== -1 && targetB !== -1) {
+      return targetA - targetB;
+    }
+
+    return 0;
+  });
+
+const graph = sankey({
+  nodes: data.nodes.map(d => ({ ...d })),
+  links: data.links.map(d => ({ ...d }))
+});
+
+graph.nodes.forEach(d => {
+  d.total =
+    d3.sum(d.sourceLinks, l => l.value) ||
+    d3.sum(d.targetLinks, l => l.value);
+});
+
+const leftPad = 400;
+const topPad = 150;
+
+const svg = d3.select("svg")
+  .attr("viewBox", [0, -topPad, height + leftPad, width + topPad]);
+
+const chart = svg.append("g")
+  .attr("transform", `translate(${height + leftPad}, 0) rotate(90)`);
+
+chart.append("g")
+  .selectAll("path")
+  .data(graph.links)
+  .join("path")
+  .attr("class", "link")
+  .attr("d", d3.sankeyLinkHorizontal())
+  .attr("stroke", d => d.source.color)
+  .attr("stroke-width", d => Math.max(1, d.width));
+
+
+const node = chart.append("g")
+  .selectAll("g")
+  .data(graph.nodes)
+  .join("g")
+  .attr("class", "node");
+
+node.append("rect")
+  .attr("fill", d => COLORS[d.name] || "#999")
+  .attr("x", d => d.x0)
+  .attr("y", d => d.y0)
+  .attr("height", d => d.y1 - d.y0)
+  .attr("width", d => d.x1 - d.x0);
+
+
+const isMobile = window.matchMedia("(max-width: 700px)").matches;
+
+if (!isMobile) {
+
+  // WIDESCREEN VERSION — unchanged
+  function wrapSvgText(text, maxWidth) {
+    text.each(function() {
+      const text = d3.select(this);
+      const words = text.text().split(/\s+/).reverse();
+
+      const x = text.attr("x");
+      const y = text.attr("y");
+      const lineHeight = 30;
+
+      let line = [];
+      let lineNumber = 0;
+      let word;
+
+      text.text(null);
+
+      let tspan = text.append("tspan")
+        .attr("x", x)
+        .attr("y", y);
+
+      while (word = words.pop()) {
+        line.push(word);
+        tspan.text(line.join(" "));
+
+        if (tspan.node().getComputedTextLength() > maxWidth && line.length > 1) {
+          line.pop();
+          tspan.text(line.join(" "));
+
+          line = [word];
+
+          tspan = text.append("tspan")
+            .attr("x", x)
+            .attr("y", y)
+            .attr("dy", `${++lineNumber * lineHeight}px`)
+            .text(word);
+        }
+      }
+
+      text.selectAll("tspan")
+        .attr("dy", (d, i) => `${(i - lineNumber) * lineHeight}px`);
+
+      text.selectAll("tspan")
+        .filter(function() {
+          return d3.select(this).text().includes("$");
+        })
+        .attr("font-family", "Benton Strong");
+    });
+  }
+
+  const nameLabels = node.append("text")
+    .attr("x", d => (d.x0 + d.x1) / 2)
+    .attr("y", d => (d.y0 + d.y1) / 2 + (d.depth === 0 ? -30 : 60))
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "middle")
+    .attr("font-size", 28)
+    .attr("transform", d => `
+      rotate(-90, ${(d.x0 + d.x1) / 2}, ${(d.y0 + d.y1) / 2})
+    `)
+    .text(d => d.name + " " + formatMoneyShort(d.total))
+    .call(wrapSvgText, 10);
+
+} else {
+const svgWidth = svg.node().getBoundingClientRect().width;
+const scaleFactor = svgWidth / height;
+const textScale = 1 /// scaleFactor;
+const mobileHeightMultiplier = 1.5;
+
+svg.attr(
+  "viewBox",
+  [
+    0,
+    0,
+    height + leftPad,
+    (width + 120) * mobileHeightMultiplier
+  ]
+);
+chart.attr(
+  "transform",
+  `translate(${height + leftPad}, 180) rotate(90)`
+);
+
+function wrapSvgTextMobile(text, maxWidth) {
+  text.each(function() {
+    const text = d3.select(this);
+    const words = text.text().split(/\s+/).reverse();
+
+    const x = text.attr("x");
+    const y = text.attr("y");
+    const lineHeight = 46;
+
+    let line = [];
+    let lineNumber = 0;
+    let word;
+
+    text.text(null);
+
+    let tspan = text.append("tspan")
+      .attr("x", x)
+      .attr("y", y);
+
+    while (word = words.pop()) {
+      line.push(word);
+      tspan.text(line.join(" "));
+
+      if (
+        tspan.node().getComputedTextLength() > maxWidth &&
+        line.length > 1
+      ) {
+
+        line.pop();
+        tspan.text(line.join(" "));
+
+        line = [word];
+
+        tspan = text.append("tspan")
+          .attr("x", x)
+          .attr("y", y)
+          .attr("dy", `${++lineNumber * lineHeight}px`)
+          .text(word);
+      }
+    }
+
+    text.selectAll("tspan")
+      .attr("dy", (d, i) =>
+        `${(i - lineNumber) * lineHeight}px`
+      );
+
+    text.selectAll("tspan")
+      .filter(function() {
+        return d3.select(this).text().includes("$");
+      })
+      .attr("font-family", "Benton Strong");
+  });
+}
+
+const mobileLabels = node.append("text")
+  .attr(
+    "x",
+    d => (d.x0 + d.x1) / 2 +
+      (d.depth === 0 ? -20 : 20)
+  )
+  .attr(
+    "y",
+    d => (d.y0 + d.y1) / 2
+    +
+      (d.depth === 0 ? 30 : 20)
+  )
+  .attr(
+    "text-anchor",
+    d => d.depth === 0 ? "end" : "start"
+  )
+  .attr("dominant-baseline", "middle")
+  .attr("font-size", 42)
+
+  .attr("transform", d => {
+
+    const x =
+      (d.x0 + d.x1) / 2 +
+      (d.depth === 0 ? -20 : 20);
+
+    const y =
+      (d.y0 + d.y1) / 2;
+
+    return `
+      translate(${x}, ${y})
+      scale(${textScale})
+      translate(${-x}, ${-y})
+    `;
+  })
+
+  .text(d =>
+    d.name + " " + formatMoneyShort(d.total)
+  )
+
+  .call(wrapSvgTextMobile, 10);
+
+}
+</script>
+
+</body>
+</html>
