@@ -184,6 +184,17 @@ const svg = d3.select("svg")
 const chart = svg.append("g")
   .attr("transform", `translate(${height + leftPad}, 0) rotate(90)`);
 
+const tooltip = d3.select("body")
+  .append("div")
+  .attr("class", "sankey-tooltip")
+  .style("position", "absolute")
+  .style("pointer-events", "none")
+  .style("background", "#fff")
+  .style("border", "1px solid #ccc")
+  .style("padding", "8px 10px")
+  .style("font-size", "14px")
+  .style("opacity", 0);
+
 chart.append("g")
   .selectAll("path")
   .data(graph.links)
@@ -191,7 +202,44 @@ chart.append("g")
   .attr("class", "link")
   .attr("d", d3.sankeyLinkHorizontal())
   .attr("stroke", d => d.source.color)
-  .attr("stroke-width", d => Math.max(1, d.width));
+  .attr("stroke-width", d => Math.max(1, d.width))
+  .on("mouseover", function(event, d) {
+  tooltip
+    .style("opacity", 1)
+    .html(`
+      <strong>${d.source.name} → ${d.target.name}</strong><br>
+      ${formatMoneyShort(d.value)}
+    `);
+
+  d3.select(this).attr("stroke-opacity", 0.8);
+})
+.on("mouseover", function(event, d) {
+
+  chart.selectAll("path")
+    .attr("stroke-opacity", 0.08);
+
+  d3.select(this)
+    .attr("stroke-opacity", 0.9);
+
+  tooltip
+    .style("opacity", 1)
+    .html(`
+      <strong>${d.source.name} → ${d.target.name}</strong><br>
+      ${formatMoneyShort(d.value)}
+    `);
+})
+.on("mousemove", function(event) {
+  tooltip
+    .style("left", `${event.pageX + 12}px`)
+    .style("top", `${event.pageY + 12}px`);
+})
+.on("mouseout", function() {
+
+  chart.selectAll("path")
+    .attr("stroke-opacity", 0.25);
+
+  tooltip.style("opacity", 0);
+});
 
 
 const node = chart.append("g")
