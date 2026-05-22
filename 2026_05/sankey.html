@@ -26,7 +26,7 @@ text {
 }
 svg {
   width: 100%;
-  max-width: 600px;
+  max-width: 700px;
   height: auto;
   display: block;
   margin: 0 auto;
@@ -43,7 +43,7 @@ svg {
 @media (max-width: 700px) {
   svg {
     width: 100%;
-    height: 1200px;
+    height: 1000px;
   }
 }
   </style>
@@ -53,8 +53,6 @@ svg {
 <svg></svg>
 
 <script>
-const width = 900;
-const height = 650;
 
 
 const rows = [
@@ -141,6 +139,10 @@ const links = rows.map(d => ({
 
 const data = { nodes, links };
 
+
+const width = 900;
+const height = 650;
+
 const sankey = d3.sankey()
   .nodeId(d => d.name)
   .nodeWidth(16)
@@ -178,11 +180,15 @@ graph.nodes.forEach(d => {
 const leftPad = 400;
 const topPad = 150;
 
+const isMobile = window.matchMedia("(max-width: 700px)").matches;
+const chartWidth = isMobile ? height * 0.7 : height;
+
+
 const svg = d3.select("svg")
-  .attr("viewBox", [0, -topPad, height + leftPad, width + topPad]);
+  .attr("viewBox", [0, -topPad, chartWidth + leftPad, width + topPad]);
 
 const chart = svg.append("g")
-  .attr("transform", `translate(${height + leftPad}, 0) rotate(90)`);
+  .attr("transform", `translate(${chartWidth + leftPad}, 0) rotate(90)`);
 
 const tooltip = d3.select("body")
   .append("div")
@@ -256,99 +262,15 @@ node.append("rect")
   .attr("width", d => d.x1 - d.x0);
 
 
-const isMobile = window.matchMedia("(max-width: 700px)").matches;
-
-if (!isMobile) {
-
-  // WIDESCREEN VERSION — unchanged
-  function wrapSvgText(text, maxWidth) {
-    text.each(function() {
-      const text = d3.select(this);
-      const words = text.text().split(/\s+/).reverse();
-
-      const x = text.attr("x");
-      const y = text.attr("y");
-      const lineHeight = 30;
-
-      let line = [];
-      let lineNumber = 0;
-      let word;
-
-      text.text(null);
-
-      let tspan = text.append("tspan")
-        .attr("x", x)
-        .attr("y", y);
-
-      while (word = words.pop()) {
-        line.push(word);
-        tspan.text(line.join(" "));
-
-        if (tspan.node().getComputedTextLength() > maxWidth && line.length > 1) {
-          line.pop();
-          tspan.text(line.join(" "));
-
-          line = [word];
-
-          tspan = text.append("tspan")
-            .attr("x", x)
-            .attr("y", y)
-            .attr("dy", `${++lineNumber * lineHeight}px`)
-            .text(word);
-        }
-      }
-
-      text.selectAll("tspan")
-        .attr("dy", (d, i) => `${(i - lineNumber) * lineHeight}px`);
-
-      text.selectAll("tspan")
-        .filter(function() {
-          return d3.select(this).text().includes("$");
-        })
-        .attr("font-family", "Benton Strong");
-    });
-  }
-
-  const nameLabels = node.append("text")
-    .attr("x", d => (d.x0 + d.x1) / 2)
-    .attr("y", d => (d.y0 + d.y1) / 2 + (d.depth === 0 ? -30 : 60))
-    .attr("text-anchor", "middle")
-    .attr("dominant-baseline", "middle")
-    .attr("font-size", 28)
-    .attr("transform", d => `
-      rotate(-90, ${(d.x0 + d.x1) / 2}, ${(d.y0 + d.y1) / 2})
-    `)
-    .text(d => d.name + " " + formatMoneyShort(d.total))
-    .call(wrapSvgText, 10);
-
-} else {
-const svgWidth = svg.node().getBoundingClientRect().width;
-const scaleFactor = svgWidth / height;
-const textScale = 1 /// scaleFactor;
-const mobileHeightMultiplier = 1.5;
-
-svg.attr(
-  "viewBox",
-  [
-    0,
-    0,
-    height + leftPad,
-    (width + 120) * mobileHeightMultiplier
-  ]
-);
-chart.attr(
-  "transform",
-  `translate(${height + leftPad}, 180) rotate(90)`
-);
-
-function wrapSvgTextMobile(text, maxWidth) {
+// WIDESCREEN VERSION — unchanged
+function wrapSvgText(text, maxWidth) {
   text.each(function() {
     const text = d3.select(this);
     const words = text.text().split(/\s+/).reverse();
 
     const x = text.attr("x");
     const y = text.attr("y");
-    const lineHeight = 46;
+    const lineHeight = 30;
 
     let line = [];
     let lineNumber = 0;
@@ -364,11 +286,7 @@ function wrapSvgTextMobile(text, maxWidth) {
       line.push(word);
       tspan.text(line.join(" "));
 
-      if (
-        tspan.node().getComputedTextLength() > maxWidth &&
-        line.length > 1
-      ) {
-
+      if (tspan.node().getComputedTextLength() > maxWidth && line.length > 1) {
         line.pop();
         tspan.text(line.join(" "));
 
@@ -383,9 +301,7 @@ function wrapSvgTextMobile(text, maxWidth) {
     }
 
     text.selectAll("tspan")
-      .attr("dy", (d, i) =>
-        `${(i - lineNumber) * lineHeight}px`
-      );
+      .attr("dy", (d, i) => `${(i - lineNumber) * lineHeight}px`);
 
     text.selectAll("tspan")
       .filter(function() {
@@ -395,48 +311,17 @@ function wrapSvgTextMobile(text, maxWidth) {
   });
 }
 
-const mobileLabels = node.append("text")
-  .attr(
-    "x",
-    d => (d.x0 + d.x1) / 2 +
-      (d.depth === 0 ? -20 : 20)
-  )
-  .attr(
-    "y",
-    d => (d.y0 + d.y1) / 2
-    +
-      (d.depth === 0 ? 30 : 20)
-  )
-  .attr(
-    "text-anchor",
-    d => d.depth === 0 ? "end" : "start"
-  )
+const nameLabels = node.append("text")
+  .attr("x", d => (d.x0 + d.x1) / 2)
+  .attr("y", d => (d.y0 + d.y1) / 2 + (d.depth === 0 ? -30 : 60))
+  .attr("text-anchor", "middle")
   .attr("dominant-baseline", "middle")
-  .attr("font-size", 42)
-
-  .attr("transform", d => {
-
-    const x =
-      (d.x0 + d.x1) / 2 +
-      (d.depth === 0 ? -20 : 20);
-
-    const y =
-      (d.y0 + d.y1) / 2;
-
-    return `
-      translate(${x}, ${y})
-      scale(${textScale})
-      translate(${-x}, ${-y})
-    `;
-  })
-
-  .text(d =>
-    d.name + " " + formatMoneyShort(d.total)
-  )
-
-  .call(wrapSvgTextMobile, 10);
-
-}
+  .attr("font-size", 28)
+  .attr("transform", d => `
+    rotate(-90, ${(d.x0 + d.x1) / 2}, ${(d.y0 + d.y1) / 2})
+  `)
+  .text(d => d.name + " " + formatMoneyShort(d.total))
+  .call(wrapSvgText, 10);
 </script>
 
 </body>
